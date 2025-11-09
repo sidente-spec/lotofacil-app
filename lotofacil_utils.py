@@ -1,58 +1,24 @@
-import requests
 import pandas as pd
-import random
+import numpy as np
+from datetime import datetime, timedelta
 
-URL = "https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil"
-
-def baixar_resultado_atual():
-    """Baixa o último resultado da Lotofácil da API da Caixa."""
-    headers = {"accept": "application/json"}
-    response = requests.get(URL, headers=headers)
-    data = response.json()
-
-    dezenas = [int(n) for n in data["listaDezenas"]]
-    concurso = int(data["numero"])
-    data_sorteio = data["dataApuracao"]
-
-    df = pd.DataFrame([{
-        "concurso": concurso,
-        "data": data_sorteio,
-        **{f"dezena_{i+1}": dezenas[i] for i in range(15)}
-    }])
-
+def carregar_dados():
+    """Simula a carga de dados históricos da Lotofácil."""
+    np.random.seed(42)
+    sorteios = []
+    datas = []
+    base_date = datetime.today() - timedelta(days=100*3)
+    for i in range(100):
+        numeros = sorted(np.random.choice(range(1, 26), 15, replace=False))
+        sorteios.append(numeros)
+        datas.append(base_date + timedelta(days=i*3))
+    df = pd.DataFrame(sorteios, columns=[f'Num{i+1}' for i in range(15)])
+    df['Concurso'] = range(1, 101)
+    df['Data'] = pd.to_datetime(datas).dt.date
+    colunas = ['Concurso', 'Data'] + [f'Num{i+1}' for i in range(15)]
+    df = df[colunas]
     return df
 
-def atualizar_resultados(caminho_csv="resultados.csv"):
-    """Atualiza o histórico de resultados, adicionando novos concursos."""
-    try:
-        df_existente = pd.read_csv(caminho_csv)
-        ultimo_concurso = df_existente["concurso"].max()
-    except FileNotFoundError:
-        df_existente = pd.DataFrame()
-        ultimo_concurso = 0
-
-    novo = baixar_resultado_atual()
-    if novo["concurso"].iloc[0] > ultimo_concurso:
-        df_atualizado = pd.concat([df_existente, novo], ignore_index=True)
-        df_atualizado.to_csv(caminho_csv, index=False)
-        return df_atualizado, True
-    else:
-        return df_existente, False
-
-def calcular_estatisticas(df):
-    """Calcula estatísticas básicas das dezenas."""
-    dezenas = df.filter(like="dezena_").values.flatten()
-    freq = pd.Series(dezenas).value_counts().sort_index()
-
-    stats = pd.DataFrame({
-        "Dezena": freq.index,
-        "Frequência": freq.values,
-        "Probabilidade (%)": (freq.values / freq.sum()) * 100
-    }).sort_values(by="Dezena")
-
-    return stats
-
-def sugerir_dezenas(stats, qtd=15):
-    """Sugere dezenas com base nas mais frequentes."""
-    top = stats.sort_values(by="Frequência", ascending=False).head(qtd)["Dezena"].tolist()
-    return sorted(random.sample(top, 15))
+def atualizar_jogos():
+    """Função para atualizar/baixar dados reais. Aqui ainda simula."""
+    return carregar_dados()
