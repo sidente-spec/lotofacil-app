@@ -6,7 +6,6 @@ st.set_page_config(page_title="Estatísticas Lotofácil", layout="wide")
 
 st.title("📊 Estatísticas da Lotofácil")
 
-# Carregar dados reais ou do estado da sessão
 if 'df_lotofacil' not in st.session_state:
     try:
         st.session_state.df_lotofacil = carregar_dados_reais()
@@ -14,7 +13,6 @@ if 'df_lotofacil' not in st.session_state:
         st.error(f"Erro ao carregar dados reais: {e}")
         st.stop()
 
-# Botão para atualizar jogos
 if st.button("🔄 Atualizar jogos (baixar últimos resultados)"):
     try:
         st.session_state.df_lotofacil = carregar_dados_reais()
@@ -22,13 +20,63 @@ if st.button("🔄 Atualizar jogos (baixar últimos resultados)"):
     except Exception as e:
         st.error(f"Erro ao atualizar: {e}")
 
-# Mostrar tabela de resultados
-st.subheader("📅 Últimos resultados")
-st.dataframe(st.session_state.df_lotofacil)
+df = st.session_state.df_lotofacil
 
-# Aqui você pode adicionar outras análises ou botões interativos
-# Exemplo:
-# - Estatísticas de números mais saídos
-# - Relação com jogos anteriores
-# - Números repetidos entre concursos
-# - Sugestão de palpites
+# Mostrar tabela completa
+st.subheader("📅 Últimos resultados")
+st.dataframe(df)
+
+# Seletor de quantidade de sorteios para análise
+num_sorteios = st.slider("Quantos últimos sorteios considerar?", min_value=2, max_value=len(df), value=10)
+ultimos = df.tail(num_sorteios).reset_index(drop=True)
+
+st.subheader(f"Últimos {num_sorteios} sorteios")
+st.dataframe(ultimos)
+
+# Botão para repetidos entre 2 últimos sorteios
+if st.button("Mostrar números repetidos entre os 2 últimos sorteios"):
+    if len(ultimos) < 2:
+        st.warning("Escolha pelo menos 2 sorteios.")
+    else:
+        conjunto1 = set(ultimos.iloc[-1].drop(['Concurso','Data']))
+        conjunto2 = set(ultimos.iloc[-2].drop(['Concurso','Data']))
+        repetidos = sorted(conjunto1.intersection(conjunto2))
+        st.write(f"Números repetidos: {repetidos if repetidos else 'Nenhum número repetido'}")
+
+# Seleção de números que vão e que não vão sair
+st.subheader("Escolha seus números de confiança")
+col1, col2 = st.columns(2)
+with col1:
+    nums_vao = st.multiselect("Números que você acredita que vão sair:", options=list(range(1,26)))
+with col2:
+    nums_nao = st.multiselect("Números que você acredita que NÃO vão sair:", options=list(range(1,26)))
+
+if set(nums_vao).intersection(set(nums_nao)):
+    st.error("Erro: um número não pode estar em ambos os grupos.")
+else:
+    st.subheader("🔮 Sugestões baseadas nas suas escolhas")
+    # Frequência considerando últimos sorteios
+    apenas_numeros = ultimos.drop(['Concurso','Data'], axis=1).values.flatten()
+    freq = pd.Series(apenas_numeros).value_counts().sort_index()
+    df_freq = pd.DataFrame({
+        'Número': range(1,26),
+        'Frequência': [freq.get(num,0) for num in range(1,26)]
+    })
+    if nums_vao:
+        df_freq.loc[~df_freq['Número'].isin(nums_vao), 'Frequência'] = 0
+    if nums_nao:
+        df_freq.loc[df_freq['Número'].isin(nums_nao), 'Frequência'] = 0
+    df_freq = df_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
+    st.write("Frequência ajustada:")
+    st.dataframe(df_freq)
+    sugestao = df_freq[df_freq['Frequência']>0]['Número'].tolist()
+    if len(sugestao) >= 15:
+        sugestao = sugestao[:15]
+        st.success(f"Sugestão de 15 números: {sugestao}")
+    else:
+        st.warning("Não há números suficientes após aplicar os filtros.")
+
+# Gráfico de repetição geral
+st.subheader("Números que mais se repetem entre os últimos sorteios selecionados")
+repetidos_geral = pd.Series(ultimos.drop(['Concurso','Data'], axis=1).values.flatten()).value_counts()
+st.bar_chart(repetidos_geral)
