@@ -7,15 +7,27 @@ def baixar_resultados_asloterias(url: str) -> pd.DataFrame:
     resp = requests.get(url)
     resp.raise_for_status()
     content = resp.content
+
+    # Tentar abrir como Excel
     try:
         df = pd.read_excel(io.BytesIO(content))
     except Exception:
-        df = pd.read_csv(io.StringIO(content.decode('utf‑8')))
+        # fallback para CSV
+        try:
+            df = pd.read_csv(io.StringIO(content.decode('utf-8')), sep=';', engine='python')
+        except Exception as e:
+            raise ValueError(f"Não foi possível ler o arquivo baixado: {e}")
+
+    # Conferir colunas mínimas
     if 'Concurso' not in df.columns or 'Data' not in df.columns:
         raise ValueError("Arquivo baixado não contém colunas 'Concurso' e 'Data'.")
+
+    # Converter data
     df['Data'] = pd.to_datetime(df['Data'], dayfirst=True).dt.date
+
     return df
 
 def carregar_dados_reais():
-    url = "https://asloterias.com.br/download-todos-resultados-lotofacil"  # Página de download da planilha. Substitua por link direto se achar.
+    # Substitua por link direto do arquivo Excel da As Loterias
+    url = "COLE_AQUI_O_LINK_DIRETO_DO_XLSX"
     return baixar_resultados_asloterias(url)
