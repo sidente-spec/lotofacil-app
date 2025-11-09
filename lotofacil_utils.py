@@ -1,24 +1,26 @@
+import requests
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+import io
 
-def carregar_dados():
-    """Simula a carga de dados históricos da Lotofácil."""
-    np.random.seed(42)
-    sorteios = []
-    datas = []
-    base_date = datetime.today() - timedelta(days=100*3)
-    for i in range(100):
-        numeros = sorted(np.random.choice(range(1, 26), 15, replace=False))
-        sorteios.append(numeros)
-        datas.append(base_date + timedelta(days=i*3))
-    df = pd.DataFrame(sorteios, columns=[f'Num{i+1}' for i in range(15)])
-    df['Concurso'] = range(1, 101)
-    df['Data'] = pd.to_datetime(datas).dt.date
-    colunas = ['Concurso', 'Data'] + [f'Num{i+1}' for i in range(15)]
-    df = df[colunas]
+def baixar_resultados_asloterias(url: str) -> pd.DataFrame:
+    """Baixa arquivo Excel/CSV da As Loterias com resultados da Lotofácil."""
+    resp = requests.get(url)
+    resp.raise_for_status()
+    content = resp.content
+    try:
+        # tentar Excel primeiro
+        df = pd.read_excel(io.BytesIO(content))
+    except Exception:
+        # fallback para CSV
+        df = pd.read_csv(io.StringIO(content.decode('utf‑8')))
+    # Ajuste de colunas conforme experimento
+    # Verificar se possui colunas 'Concurso' e 'Data'
+    if 'Concurso' not in df.columns or 'Data' not in df.columns:
+        raise ValueError("Arquivo baixado não contém colunas esperadas 'Concurso' e 'Data'.")
+    # Converter Data para tipo date
+    df['Data'] = pd.to_datetime(df['Data'], dayfirst=True).dt.date
     return df
 
-def atualizar_jogos():
-    """Função para atualizar/baixar dados reais. Aqui ainda simula."""
-    return carregar_dados()
+def carregar_dados_reais():
+    url = "COLE_AQUI_LINK_EXATO_DA_PLANILHA"
+    return baixar_resultados_asloterias(url)
